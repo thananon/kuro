@@ -9,12 +9,12 @@ import React, {
 import {
 	continueRender,
 	delayRender,
-	Img,
 	interpolate,
 	staticFile,
 	useCurrentFrame,
 	useVideoConfig,
 } from 'remotion';
+import {Gif} from '@remotion/gif';
 import Papa from 'papaparse';
 import './fonts.css';
 
@@ -45,7 +45,7 @@ const tiers: Record<number, RegExp> = {
 	3: /ผ่อนบ้าน/,
 };
 
-const membersFetch: Promise<Array<IMember>> = new Promise((resolve, reject) => {
+const membersFetch: Promise<Array<IMember>> = new Promise((resolve) => {
 	Papa.parse(memberCsvPath, {
 		download: true,
 		header: true,
@@ -76,12 +76,14 @@ const getMembersFromTier = (members: Array<IMember>, tier: number) => {
 	});
 };
 
+interface MembersProps {
+	readonly divRef: RefObject<HTMLDivElement>;
+	readonly translateY: number;
+	readonly onLoad: () => void;
+}
+
 const Members = React.memo(
-	(props: {
-		divRef: RefObject<HTMLDivElement>;
-		translateY: number;
-		onLoad: () => void;
-	}) => {
+	(props: MembersProps) => {
 		const [members, setMembers] = useState<Array<IMember>>([]);
 		const [handle] = useState(() => delayRender());
 
@@ -114,12 +116,7 @@ const Members = React.memo(
 				</h1>
 
 				<section id="tier-4" style={{marginTop: '200px'}}>
-					<h2 style={{fontWeight: 100}}>ประธานบอร์ดบริหาร</h2>
-
-					<Img
-						src={staticFile('images/example.gif')}
-						style={{width: '300px', marginBottom: '32px'}}
-					/>
+					<h2 style={{fontWeight: 200}}>ประธานบอร์ดบริหาร</h2>
 
 					<div style={{fontSize: '160px', ...(customStyles.becky_style ?? {})}}>
 						becky_style
@@ -127,11 +124,11 @@ const Members = React.memo(
 				</section>
 
 				<section id="tier-3" style={{marginTop: '300px'}}>
-					<h2 style={{fontWeight: 100}}>ทีมช่วยผ่อนบ้าน</h2>
+					<h2 style={{fontWeight: 200}}>ทีมช่วยผ่อนบ้าน</h2>
 
-					<Img
-						src={staticFile('images/example.gif')}
-						style={{width: '200px', marginBottom: '32px'}}
+					<Gif
+						src={staticFile('images/HOME.gif')}
+						style={{width: '800px', marginBottom: '32px'}}
 					/>
 
 					<div
@@ -159,11 +156,11 @@ const Members = React.memo(
 				</section>
 
 				<section id="tier-2" style={{marginTop: '800px'}}>
-					<h2 style={{fontWeight: 100}}>ทีมเลี้ยงข้าว</h2>
+					<h2 style={{fontWeight: 200}}>ทีมเลี้ยงข้าว</h2>
 
-					<Img
-						src={staticFile('images/example.gif')}
-						style={{width: '200px', marginBottom: '32px'}}
+					<Gif
+						src={staticFile('images/EAT-EAT.gif')}
+						style={{width: '700px', marginBottom: '32px'}}
 					/>
 
 					<div
@@ -201,7 +198,11 @@ const Members = React.memo(
 				</section>
 
 				<section id="tier-1" style={{marginTop: '500px'}}>
-					<h2 style={{fontWeight: 100}}>และทีมเลี้ยงกาแฟทุกท่าน</h2>
+					<h2 style={{fontWeight: 200}}>และทีมเลี้ยงกาแฟทุกท่าน</h2>
+					<Gif
+						src={staticFile('images/COFFEE.gif')}
+						style={{width: '600px', marginBottom: '32px'}}
+					/>
 				</section>
 			</div>
 		);
