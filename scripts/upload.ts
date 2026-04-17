@@ -7,7 +7,7 @@ const execFileP = promisify(execFile);
 
 // The folder ID is the "1abc...xyz" segment of a Drive folder URL:
 // drive.google.com/drive/folders/<id>
-const GDRIVE_FOLDER_ID = '1fHbu8qKKpBluqK3Nqs9GsL4k2EvLmW69';
+const GDRIVE_FOLDER_ID = '1grF18AoeRkvjXR46VWpBOt_1omyYPSOn';
 // gog account selector; matches one of the identities added via `gog auth add`.
 const GOG_ACCOUNT = 'thananon@9arm.co';
 const DRIVE_FILENAME = 'CreditRoll.mp4';
