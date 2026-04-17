@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run upgrade` — `remotion upgrade` (Remotion's version bumper).
 - `npm run upload` — Uploads the already-built `out/CreditRoll.mp4` to the Drive folder configured in `scripts/upload.ts`. Finds any existing `CreditRoll.mp4` in the folder and replaces its content in place via `gog drive upload --replace`, preserving the shared link. Requires `gog` installed and authenticated (see below). Fails fast with `Run npm run build first` if the MP4 isn't there.
 - `npm run publish` — Chains `npm run build && npm run upload`.
+- `npm run fetch-members` — Refreshes `public/members.csv` by driving the user's real Chrome via AppleScript + injected JS (no CDP, no scratch profile, no automation flag). Clicks Studio's "See your members" → "Export all members to CSV file" → polls for the "ready" banner → clicks Download → moves the new CSV from `~/Downloads/` into `public/members.csv` atomically. Requires the one-time Chrome setup below.
 
 There is no single-test runner because there is no test suite — `npm test` is lint + typecheck only.
 
@@ -28,6 +29,17 @@ gog auth credentials ~/path/to/client_secret.json
 gog auth add thananon@9arm.co
 ```
 The script passes `--account thananon@9arm.co` on every gog call (value of `GOG_ACCOUNT` in `scripts/upload.ts`). If you change accounts, update that constant — there's no env var indirection.
+
+## One-time Chrome setup (for `npm run fetch-members`)
+
+The members scraper drives your actual Chrome via AppleScript. Two one-time toggles are required:
+
+1. **Chrome → View → Developer → Allow JavaScript from Apple Events** (off by default since Chrome 71). Without this, AppleScript's `execute javascript` fails and the script tells you exactly what to enable.
+2. **Chrome → Settings → Downloads → Ask where to save each file before downloading — OFF.** With it on, every download triggers a native macOS save dialog that would block the script. Default location should be `~/Downloads/`.
+
+macOS will also prompt once for Automation permission the first time the script tries to control Chrome — approve it in System Settings → Privacy & Security → Automation.
+
+Why this approach is safer than the earlier attempts: this uses your real Chrome binary and real default profile — no `--remote-debugging-port` (Chrome blocks it on the default profile), no scratch profile login (Google's risk engine blocks fresh-profile logins), no cookie transplant (Google invalidates transplanted sessions as theft). AppleScript's JS injection goes through Chrome's own internal hook, so from Google's server perspective, every request looks identical to a human clicking.
 
 ## Scheduled publish (Saturday 00:00)
 
