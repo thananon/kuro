@@ -58,35 +58,79 @@ async function runJS(js: string): Promise<string> {
 	);
 }
 
-async function activateChrome(): Promise<void> {
-	await osa(`tell application "Google Chrome" to activate`);
+async function isChromeRunning(): Promise<boolean> {
+	try {
+		await execFileP('pgrep', ['-x', 'Google Chrome']);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 /**
- * Find an existing Studio memberships tab in the front window. If none, open one.
- * Sets it as the active tab either way.
+ * Start Chrome if it's not running and wait for it to become scriptable.
+ * Safe to call when Chrome is already running — no-op in that case.
  */
-async function switchToStudioTab(): Promise<void> {
-	const script = `
+async function ensureChromeRunning(): Promise<void> {
+	if (await isChromeRunning()) {
+		await osa(`tell application "Google Chrome" to activate`);
+		return;
+	}
+	process.stdout.write('starting Chrome...\n');
+	await execFileP('open', ['-a', 'Google Chrome']);
+	const deadline = Date.now() + 15_000;
+	while (Date.now() < deadline) {
+		try {
+			await osa('tell application "Google Chrome" to count windows');
+			await osa(`tell application "Google Chrome" to activate`);
+			return;
+		} catch {
+			await new Promise((r) => setTimeout(r, 500));
+		}
+	}
+	die('Chrome did not become scriptable within 15s of launch.');
+}
+
+/**
+ * Always open a NEW tab dedicated to this script's run, pointed at the
+ * memberships URL. Returns the tab's AppleScript id so we can close exactly
+ * that tab at the end without touching any of the user's existing tabs.
+ */
+async function openOwnedStudioTab(): Promise<number> {
+	const out = await osa(`
 tell application "Google Chrome"
 	if (count of windows) = 0 then
 		make new window
 	end if
-	set allTabs to every tab of front window
-	repeat with i from 1 to count of allTabs
-		set t to item i of allTabs
-		if URL of t starts with "https://studio.youtube.com/" then
-			set active tab index of front window to i
-			set URL of t to "${STUDIO_URL}"
-			return "reused:" & i
-		end if
-	end repeat
 	set newTab to make new tab at end of tabs of front window with properties {URL:"${STUDIO_URL}"}
 	set active tab index of front window to (count of tabs of front window)
-	return "opened"
+	return id of newTab
 end tell
-`;
-	await osa(script);
+`);
+	const id = Number.parseInt(out, 10);
+	if (!Number.isFinite(id)) die(`unexpected tab id from Chrome: ${out}`);
+	return id;
+}
+
+/**
+ * Close exactly the tab we opened. Safe if the tab is already gone.
+ * Uses a `whose` filter because Chrome's AppleScript comparison of `id of t`
+ * inside a manual repeat loop silently misses matches — only `whose id is X`
+ * matches reliably.
+ */
+async function closeTabById(id: number): Promise<void> {
+	await osa(`
+tell application "Google Chrome"
+	repeat with w in windows
+		try
+			set t to first tab of w whose id is ${id}
+			close t
+			return "closed"
+		end try
+	end repeat
+	return "not found"
+end tell
+`);
 }
 
 async function waitFor(
@@ -272,69 +316,70 @@ async function main(): Promise<void> {
 		die(`public/ directory not found at ${path.dirname(OUTPUT_CSV)}`);
 	}
 
-	process.stdout.write('activating Chrome...\n');
-	await activateChrome();
-	await switchToStudioTab();
+	await ensureChromeRunning();
 
-	process.stdout.write('waiting for Studio overview to load...\n');
-	await assertLoggedIn();
-	await waitForButton(
-		'button',
-		'See your members',
-		'aria-label',
-		PAGE_LOAD_TIMEOUT_MS,
-		'Studio memberships overview did not become interactive within 30s — UI may have changed or you may not be signed in.',
-	);
-	await assertLoggedIn();
+	process.stdout.write('opening a dedicated Studio tab...\n');
+	const tabId = await openOwnedStudioTab();
 
-	process.stdout.write('opening member list drawer...\n');
-	await clickByLabel(['button', 'ytcp-button'], 'See your members');
+	try {
+		process.stdout.write('waiting for Studio overview to load...\n');
+		await assertLoggedIn();
+		await waitForButton(
+			'button',
+			'See your members',
+			'aria-label',
+			PAGE_LOAD_TIMEOUT_MS,
+			'Studio memberships overview did not become interactive within 30s — UI may have changed or you may not be signed in.',
+		);
+		await assertLoggedIn();
 
-	process.stdout.write('waiting for member list to expose the Export control...\n');
-	await waitForButton(
-		'ytcp-icon-button',
-		'Export all members to CSV file',
-		'aria-label',
-		PAGE_LOAD_TIMEOUT_MS,
-		'Export control did not appear within 30s — UI may have changed.',
-	);
+		process.stdout.write('opening member list drawer...\n');
+		await clickByLabel(['button', 'ytcp-button'], 'See your members');
 
-	const priorBanner = await getCurrentBannerText();
-	if (priorBanner) {
-		process.stdout.write(`existing export banner: "${priorBanner}"\n`);
+		process.stdout.write('waiting for member list to expose the Export control...\n');
+		await waitForButton(
+			'ytcp-icon-button',
+			'Export all members to CSV file',
+			'aria-label',
+			PAGE_LOAD_TIMEOUT_MS,
+			'Export control did not appear within 30s — UI may have changed.',
+		);
+
+		const priorBanner = await getCurrentBannerText();
+		if (priorBanner) {
+			process.stdout.write(`existing export banner: "${priorBanner}"\n`);
+		}
+
+		process.stdout.write('clicking "Export all members to CSV file"...\n');
+		await clickByLabel(['ytcp-icon-button'], 'Export all members to CSV file');
+
+		process.stdout.write('waiting for fresh export to be ready (up to 5 min)...\n');
+		await waitFor(
+			async () => {
+				const t = await getCurrentBannerText();
+				return !!t && t !== priorBanner && /is ready for download/.test(t);
+			},
+			EXPORT_READY_TIMEOUT_MS,
+			4000,
+			'Export not ready after 5 minutes — retry later.',
+		);
+
+		const before = await snapshotDownloads();
+
+		process.stdout.write('clicking Download...\n');
+		await clickByLabel(['button', 'ytcp-button'], 'Download');
+
+		const downloaded = await waitForNewMembersCsv(before);
+		process.stdout.write(`downloaded: ${downloaded}\n`);
+
+		const tmp = OUTPUT_CSV + '.tmp';
+		await fsp.copyFile(downloaded, tmp);
+		await fsp.rename(tmp, OUTPUT_CSV);
+		await fsp.unlink(downloaded).catch(() => undefined);
+		process.stdout.write(`wrote ${OUTPUT_CSV}\n`);
+	} finally {
+		await closeTabById(tabId).catch(() => undefined);
 	}
-
-	process.stdout.write('clicking "Export all members to CSV file"...\n');
-	await clickByLabel(['ytcp-icon-button'], 'Export all members to CSV file');
-
-	process.stdout.write('waiting for fresh export to be ready (up to 5 min)...\n');
-	await waitFor(
-		async () => {
-			const t = await getCurrentBannerText();
-			return (
-				!!t &&
-				t !== priorBanner &&
-				/is ready for download/.test(t)
-			);
-		},
-		EXPORT_READY_TIMEOUT_MS,
-		4000,
-		'Export not ready after 5 minutes — retry later.',
-	);
-
-	const before = await snapshotDownloads();
-
-	process.stdout.write('clicking Download...\n');
-	await clickByLabel(['button', 'ytcp-button'], 'Download');
-
-	const downloaded = await waitForNewMembersCsv(before);
-	process.stdout.write(`downloaded: ${downloaded}\n`);
-
-	const tmp = OUTPUT_CSV + '.tmp';
-	await fsp.copyFile(downloaded, tmp);
-	await fsp.rename(tmp, OUTPUT_CSV);
-	await fsp.unlink(downloaded).catch(() => undefined);
-	process.stdout.write(`wrote ${OUTPUT_CSV}\n`);
 }
 
 main().catch((err) => {
