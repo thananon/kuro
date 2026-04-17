@@ -31,7 +31,7 @@ async function gog(args: string[]): Promise<string> {
 			die('gog CLI not found on PATH. Install with: brew install gogcli');
 		}
 		const stderr = e.stderr ?? '';
-		die(`gog ${args[0]} ${args[1]} failed:\n${stderr.trim() || e.message}`);
+		die(`gog ${args.slice(0, 2).join(' ')} failed:\n${stderr.trim() || e.message}`);
 	}
 }
 
@@ -135,12 +135,15 @@ async function main(): Promise<void> {
 	}
 
 	if (!uploadedId) {
+		// Upload reached Drive but we can't print a clickable URL. Exit non-zero
+		// so `npm run publish` and any CI pipeline treats this as a partial
+		// failure instead of silently succeeding without the user-facing URL.
 		process.stderr.write(
 			'upload succeeded but could not extract file ID from gog output:\n' +
 				uploadOut +
 				'\n',
 		);
-		process.exit(0);
+		process.exit(1);
 	}
 	process.stdout.write(
 		`uploaded. https://drive.google.com/file/d/${uploadedId}/view\n`,
