@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm test` — ESLint over `src` + `tsc` for the Remotion project + `tsc -p scripts/tsconfig.json` for the Drive uploader. All three must pass; there are no unit tests.
 - `npm run upgrade` — `remotion upgrade` (Remotion's version bumper).
 - `npm run upload` — Uploads the already-built `out/CreditRoll.mp4` to the Drive folder configured in `scripts/upload.ts`. Finds any existing `CreditRoll.mp4` in the folder and replaces its content in place via `gog drive upload --replace`, preserving the shared link. Requires `gog` installed and authenticated (see below). Fails fast with `Run npm run build first` if the MP4 isn't there.
-- `npm run publish` — Chains `npm run build && npm run upload`.
+- `npm run publish` — Chains `npm run fetch-members && npm run build && npm run upload`. Strict `&&`: if the members CSV refresh fails (Chrome not running, signed out, or one of the AppleScript toggles got flipped back), build and upload are skipped. Relevant for the Saturday LaunchAgent — a sleeping Mac with no logged-in Studio session will cause the whole pipeline to skip that week.
 - `npm run fetch-members` — Refreshes `public/members.csv` by driving the user's real Chrome via AppleScript + injected JS (no CDP, no scratch profile, no automation flag). Clicks Studio's "See your members" → "Export all members to CSV file" → polls for the "ready" banner → clicks Download → moves the new CSV from `~/Downloads/` into `public/members.csv` atomically. Requires the one-time Chrome setup below.
 
 There is no single-test runner because there is no test suite — `npm test` is lint + typecheck only.

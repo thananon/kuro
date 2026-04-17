@@ -8,7 +8,7 @@
 		"upgrade": "remotion upgrade",
 		"test": "eslint src --ext ts,tsx,js,jsx && tsc && tsc -p scripts/tsconfig.json",
 		"upload": "tsx scripts/upload.ts",
-		"publish": "npm run build && npm run upload",
+		"publish": "npm run fetch-members && npm run build && npm run upload",
 		"fetch-members": "tsx scripts/fetch-members.ts"
 	},
 	"repository": {},
