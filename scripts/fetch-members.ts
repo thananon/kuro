@@ -69,12 +69,12 @@ async function isChromeRunning(): Promise<boolean> {
 
 /**
  * Start Chrome if it's not running and wait for it to become scriptable.
- * Safe to call when Chrome is already running — no-op in that case.
+ * Returns whether we launched it (true = cold start) or it was already up.
  */
-async function ensureChromeRunning(): Promise<void> {
+async function ensureChromeRunning(): Promise<{launched: boolean}> {
 	if (await isChromeRunning()) {
 		await osa(`tell application "Google Chrome" to activate`);
-		return;
+		return {launched: false};
 	}
 	process.stdout.write('starting Chrome...\n');
 	await execFileP('open', ['-a', 'Google Chrome']);
@@ -83,7 +83,7 @@ async function ensureChromeRunning(): Promise<void> {
 		try {
 			await osa('tell application "Google Chrome" to count windows');
 			await osa(`tell application "Google Chrome" to activate`);
-			return;
+			return {launched: true};
 		} catch {
 			await new Promise((r) => setTimeout(r, 500));
 		}
@@ -92,18 +92,33 @@ async function ensureChromeRunning(): Promise<void> {
 }
 
 /**
- * Always open a NEW tab dedicated to this script's run, pointed at the
- * memberships URL. Returns the tab's AppleScript id so we can close exactly
- * that tab at the end without touching any of the user's existing tabs.
+ * Open a tab at the memberships URL. On cold start (we just launched Chrome),
+ * reuses the lone blank "new tab" Chrome opens by default so we don't leave
+ * an empty tab behind — closing our tab then closes Chrome cleanly. On warm
+ * start, always opens a new tab so nothing the user already had is touched.
+ * Returns the tab's AppleScript id.
  */
-async function openOwnedStudioTab(): Promise<number> {
+async function openOwnedStudioTab(reuseLoneBlankTab: boolean): Promise<number> {
+	const reuseBlock = reuseLoneBlankTab
+		? `
+	if (count of tabs of w) = 1 then
+		set t to tab 1 of w
+		set u to URL of t
+		if u is "chrome://newtab/" or u is "chrome://new-tab-page/" or u is "about:blank" or u is "" then
+			set URL of t to "${STUDIO_URL}"
+			set active tab index of w to 1
+			return id of t
+		end if
+	end if`
+		: '';
 	const out = await osa(`
 tell application "Google Chrome"
 	if (count of windows) = 0 then
 		make new window
 	end if
-	set newTab to make new tab at end of tabs of front window with properties {URL:"${STUDIO_URL}"}
-	set active tab index of front window to (count of tabs of front window)
+	set w to front window${reuseBlock}
+	set newTab to make new tab at end of tabs of w with properties {URL:"${STUDIO_URL}"}
+	set active tab index of w to (count of tabs of w)
 	return id of newTab
 end tell
 `);
@@ -316,10 +331,14 @@ async function main(): Promise<void> {
 		die(`public/ directory not found at ${path.dirname(OUTPUT_CSV)}`);
 	}
 
-	await ensureChromeRunning();
+	const {launched} = await ensureChromeRunning();
 
-	process.stdout.write('opening a dedicated Studio tab...\n');
-	const tabId = await openOwnedStudioTab();
+	process.stdout.write(
+		launched
+			? 'reusing cold-start blank tab for Studio...\n'
+			: 'opening a dedicated Studio tab...\n',
+	);
+	const tabId = await openOwnedStudioTab(launched);
 
 	try {
 		process.stdout.write('waiting for Studio overview to load...\n');
