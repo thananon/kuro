@@ -77,7 +77,7 @@ const getMembersFromTier = (members: Array<IMember>, tier: number) => {
 };
 
 interface MembersProps {
-	readonly divRef: RefObject<HTMLDivElement>;
+	readonly divRef: RefObject<HTMLDivElement | null>;
 	readonly translateY: number;
 	readonly onLoad: () => void;
 }
