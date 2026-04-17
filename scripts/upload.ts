@@ -5,9 +5,11 @@ import {promisify} from 'node:util';
 
 const execFileP = promisify(execFile);
 
-// Edit this once you have the target Drive folder's ID. The ID is the
-// "1abc...xyz" segment in a folder URL: drive.google.com/drive/folders/<id>
-const GDRIVE_FOLDER_ID = 'TODO_FILL_IN';
+// The folder ID is the "1abc...xyz" segment of a Drive folder URL:
+// drive.google.com/drive/folders/<id>
+const GDRIVE_FOLDER_ID = '1fHbu8qKKpBluqK3Nqs9GsL4k2EvLmW69';
+// gog account selector; matches one of the identities added via `gog auth add`.
+const GOG_ACCOUNT = 'thananon@9arm.co';
 const DRIVE_FILENAME = 'CreditRoll.mp4';
 const LOCAL_PATH = path.join(process.cwd(), 'out', 'CreditRoll.mp4');
 
@@ -22,8 +24,11 @@ interface DriveFile {
 }
 
 async function gog(args: string[]): Promise<string> {
+	// --account selects the identity to use; matches gog auth add <email>.
+	// The flag is a top-level option that precedes the subcommand.
+	const allArgs = ['--account', GOG_ACCOUNT, ...args];
 	try {
-		const {stdout} = await execFileP('gog', args);
+		const {stdout} = await execFileP('gog', allArgs);
 		return stdout;
 	} catch (err) {
 		const e = err as NodeJS.ErrnoException & {stderr?: string};
@@ -81,11 +86,6 @@ function extractUploadedId(raw: string): string | null {
 async function main(): Promise<void> {
 	if (!fs.existsSync(LOCAL_PATH)) {
 		die(`Run npm run build first; ${LOCAL_PATH} is missing`);
-	}
-	if (GDRIVE_FOLDER_ID === 'TODO_FILL_IN') {
-		die(
-			'Edit scripts/upload.ts and set GDRIVE_FOLDER_ID to your target Drive folder ID',
-		);
 	}
 
 	process.stdout.write(`searching folder ${GDRIVE_FOLDER_ID} for ${DRIVE_FILENAME}...\n`);
