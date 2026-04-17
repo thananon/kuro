@@ -53,8 +53,8 @@ Single file. No library modules — the entire script fits in one readable TS fi
 
 2. **Preflight**
    - `fs.existsSync(LOCAL_PATH)` — if false, die with `Run npm run build first; out/CreditRoll.mp4 is missing`.
-   - `GDRIVE_FOLDER_ID !== 'TODO_FILL_IN'` — if false, die with `Edit scripts/upload.ts and set GDRIVE_FOLDER_ID to your target Drive folder ID`.
-   - Do **not** preflight `gog` binary presence; let the spawn fail naturally. Its `ENOENT` is clear enough, and adding a custom check is noise.
+   - ~~`GDRIVE_FOLDER_ID !== 'TODO_FILL_IN'` — if false, die with `Edit scripts/upload.ts and set GDRIVE_FOLDER_ID to your target Drive folder ID`.~~ Dropped during Task 3 once the real folder ID was committed to the script; with the constant always holding a real ID, the guard was unreachable and removed. Restore this check if you ever reset the constant to a placeholder for testing.
+   - Do preflight `gog` binary presence via the `ENOENT` catch in `gog()` — it emits `gog CLI not found on PATH. Install with: brew install gogcli` instead of Node's raw spawn error. The earlier spec note that said "don't preflight" proved to give a less readable error in practice; the implementation deviated for the better.
 
 3. **Find existing file**
    - Run `gog drive ls --parent <GDRIVE_FOLDER_ID> --max 1000 --json` (gog's default output mode is JSON-first per its README; `--json` may or may not be a flag — if it's default, drop it).
