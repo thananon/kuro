@@ -398,6 +398,19 @@ async function main(): Promise<void> {
 		process.stdout.write(`wrote ${OUTPUT_CSV}\n`);
 	} finally {
 		await closeTabById(tabId).catch(() => undefined);
+		if (launched) {
+			// We brought Chrome up for this run; put it back down. `tell to quit`
+			// sends the Apple event but can return before the process has actually
+			// exited, so poll pgrep until the main process is gone (cap: 5s).
+			await osa(`tell application "Google Chrome" to quit`).catch(
+				() => undefined,
+			);
+			const deadline = Date.now() + 5_000;
+			while (Date.now() < deadline) {
+				if (!(await isChromeRunning())) break;
+				await new Promise((r) => setTimeout(r, 200));
+			}
+		}
 	}
 }
 
