@@ -29,6 +29,18 @@ gog auth add thananon@9arm.co
 ```
 The script passes `--account thananon@9arm.co` on every gog call (value of `GOG_ACCOUNT` in `scripts/upload.ts`). If you change accounts, update that constant — there's no env var indirection.
 
+## Scheduled publish (Saturday 00:00)
+
+A LaunchAgent runs `npm run publish` every Saturday at midnight local time. Install once:
+
+```
+scripts/install-launchd.sh
+```
+
+This copies `scripts/co.9arm.kuro-publish.plist` into `~/Library/LaunchAgents/` and loads it via `launchctl bootstrap`. Idempotent — re-running reloads after edits. Uninstall with `scripts/uninstall-launchd.sh`.
+
+Logs go to `~/Library/Logs/kuro-publish.{out,err}.log`. `launchd` deferred-fires when the Mac wakes, so a sleeping machine at 00:00 Saturday still runs the job on next wake (unlike cron).
+
 ## Architecture
 
 Single-composition Remotion project. Flow:
