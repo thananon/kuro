@@ -42,7 +42,8 @@ const memberCsvPath = staticFile(`/members.csv`);
 const tiers: Record<number, RegExp> = {
 	1: /เลี้ยงกาแฟ/,
 	2: /เลี้ยงข้าว/,
-	3: /ผ่อนบ้าน/,
+	3: /เลี้ยงค่า Token/,
+	4: /ผ่อนบ้าน/,
 };
 
 const membersFetch: Promise<Array<IMember>> = new Promise((resolve) => {
@@ -115,7 +116,7 @@ const Members = React.memo(
 					ขอขอบคุณเหล่านายทุน
 				</h1>
 
-				<section id="tier-4" style={{marginTop: '200px'}}>
+				<section id="tier-becky" style={{marginTop: '200px'}}>
 					<h2 style={{fontWeight: 200}}>ประธานบอร์ดบริหาร</h2>
 
 					<div style={{fontSize: '160px', ...(customStyles.becky_style ?? {})}}>
@@ -123,7 +124,7 @@ const Members = React.memo(
 					</div>
 				</section>
 
-				<section id="tier-3" style={{marginTop: '300px'}}>
+				<section id="tier-4" style={{marginTop: '300px'}}>
 					<h2 style={{fontWeight: 200}}>ทีมช่วยผ่อนบ้าน</h2>
 
 					<Gif
@@ -140,6 +141,33 @@ const Members = React.memo(
 							width: '70%',
 							margin: '0 auto',
 							fontSize: '64px',
+						}}
+					>
+						{getMembersFromTier(members, 4).map((m, idx) => {
+							return (
+								<div
+									key={idx}
+									style={{color: 'white', ...(customStyles[m.Member] ?? {})}}
+								>
+									{m.Member}
+								</div>
+							);
+						})}
+					</div>
+				</section>
+
+				<section id="tier-3" style={{marginTop: '500px'}}>
+					<h2 style={{fontWeight: 200}}>ทีมเลี้ยงค่า Token</h2>
+
+					<div
+						style={{
+							display: 'flex',
+							flexDirection: 'column',
+							flexWrap: 'wrap',
+							justifyItems: 'center',
+							width: '70%',
+							margin: '0 auto',
+							fontSize: '48px',
 						}}
 					>
 						{getMembersFromTier(members, 3).map((m, idx) => {
